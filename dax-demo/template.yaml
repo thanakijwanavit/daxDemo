@@ -1,0 +1,101 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: >
+  Sample SAM Template for dax-demo
+
+Globals:
+  Function:
+    Timeout: 3
+
+Resources:
+  CacheTable:
+    Type: AWS::Serverless::SimpleTable
+    Properties:
+      PrimaryKey:
+        Name: CacheIndex
+        Type: String
+      TableName: !Join [ "-", [!Ref 'AWS::StackName', 'cache'] ]
+  CacheDax:
+    Type: AWS::DAX::Cluster
+    Properties: 
+      Description: cache Table accelerator
+      IAMRoleARN: !GetAtt CacheDaxRole.Arn
+      NodeType: dax.t2.small
+      ReplicationFactor: 1
+  CacheDaxRole:
+    Type: AWS::IAM::Role
+    Properties: 
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+              - lambda.amazonaws.com
+            Action:
+              - 'sts:AssumeRole'
+      ManagedPolicyArns: 
+        - !Ref DaxServicePolicy
+
+  ReadDaxPolicy:
+    Type: 'AWS::IAM::ManagedPolicy'
+    Properties:
+      ManagedPolicyName: ReadDax
+      PolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Action:
+              - "dax:GetItem"
+              - "dax:BatchGetItem"
+              - "dax:Query"
+              - "dax:Scan"
+              - "dax:PutItem"
+              - "dax:UpdateItem"
+              - "dax:DeleteItem"
+              - "dax:BatchWriteItem"
+              - "dax:DefineKeySchema"
+              - "dax:DefineAttributeList"
+              - "dax:DefineAttributeListId"
+              - "dax:Endpoints"
+              - "dax:ConditionCheckItem"
+            Resource: !GetAtt CacheDax.Arn
+          - Effect: Allow
+            Action:
+              - "dynamodb:GetItem"
+              - "dynamodb:BatchGetItem"
+              - "dynamodb:Query"
+              - "dynamodb:Scan"
+              - "dynamodb:PutItem"
+              - "dynamodb:UpdateItem"
+              - "dynamodb:DeleteItem"
+              - "dynamodb:BatchWriteItem"
+              - "dynamodb:DescribeTable"
+              - "dynamodb:ConditionCheckItem"
+            Resource: !GetAtt CacheTable.Arn
+  DaxServicePolicy:
+    Type: 'AWS::IAM::ManagedPolicy'
+    Properties:
+      ManagedPolicyName: ReadDax
+      PolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Action:
+              - "dynamodb:GetItem"
+              - "dynamodb:BatchGetItem"
+              - "dynamodb:Query"
+              - "dynamodb:Scan"
+              - "dynamodb:PutItem"
+              - "dynamodb:UpdateItem"
+              - "dynamodb:DeleteItem"
+              - "dynamodb:BatchWriteItem"
+              - "dynamodb:DescribeTable"
+            Resource: !GetAtt CacheTable.Arn
+
+Outputs:
+  DaxEndpoint:
+    Value: !GetAtt CacheDax.ClusterDiscoveryEndpoint
+  ReadDaxPolicy:
+    Value: !Ref ReadDaxPolicy
+
